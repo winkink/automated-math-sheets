@@ -26,8 +26,21 @@ import warnings
 from fractions import Fraction
 from warnings import warn
 
-import sympy as sp
-from sympy import Rational, cos, latex, pi, sin, tan
+from sympy import (
+    Eq,
+    Rational,
+    Symbol,
+    acos,
+    asin,
+    atan,
+    cos,
+    latex,
+    pi,
+    simplify,
+    sin,
+    sqrt,
+    tan,
+)
 
 # ---------------------------------------------------------------------------
 # CONFIGURATION VARIABLES (defaults; can be overridden via CLI flags below)
@@ -45,20 +58,22 @@ OUTPUT_FILE = "trig_questions.tex"
 # limitation, not a script limitation), so exact-value/equation questions are
 # drawn from this set of denominators, scaled up to MAX_ANGLE_MULTIPLE.
 NICE_DENOMINATORS = [1, 2, 3, 4, 6]
-
 MAX_GEN_ATTEMPTS_PER_Q = 300  # retries allowed before accepting a duplicate
 
 TRIG_FUNCS = {"sin": (sin, "\\sin"), "cos": (cos, "\\cos"), "tan": (tan, "\\tan")}
+TRIG_FUNC_NAMES = list(TRIG_FUNCS.keys())
+
+# General solution specific constants
 TRIG_FUNCS_GENSOL = {
     "sin": (
         sin,
         "\\sin",
-        [0, 1 / 2, sqrt(2) / 2, sqrt(3) / 2, 1],
+        [0, Rational(1, 2), sqrt(2) / 2, sqrt(3) / 2, 1],
     ),
     "cos": (
         cos,
         "\\cos",
-        [0, 1 / 2, sqrt(2) / 2, sqrt(3) / 2, 1],
+        [0, Rational(1, 2), sqrt(2) / 2, sqrt(3) / 2, 1],
     ),
     "tan": (
         tan,
@@ -66,7 +81,11 @@ TRIG_FUNCS_GENSOL = {
         [0, sqrt(3) / 3, 1, sqrt(3)],
     ),
 }
-TRIG_FUNC_NAMES = list(TRIG_FUNCS.keys())
+
+# Symbols reused by the "general solution" question generator: x is the
+# unknown being solved for, n is the free integer parameter in the answer.
+X = Symbol("x")
+N = Symbol("n", integer=True)
 
 
 # ---------------------------------------------------------------------------
@@ -108,7 +127,7 @@ def genprob_exact_val(maxAngle, usedSigs, allowReps=False):
 
         # Generate the angle
         angle = Rational(numerSim, denomSim) * pi
-        value = sp.simplify(func(angle))
+        value = simplify(func(angle))
 
         # LaTeX formatting
         angleTex = latex(Rational(numer, denom) * pi)
@@ -130,7 +149,9 @@ def genprob_exact_val(maxAngle, usedSigs, allowReps=False):
     return None
 
 
-def genprob_gen_solution(maxCoeffMultiple, maxFactorMultiple, allowReps=False):
+def genprob_gen_solution(
+    maxCoeffMultiple, maxFactorMultiple, usedSigs, allowReps=False
+):
     for _ in range(MAX_GEN_ATTEMPTS_PER_Q):
         # Pick a trig function
         funcName = rd.choice(TRIG_FUNC_NAMES)
@@ -145,34 +166,27 @@ def genprob_gen_solution(maxCoeffMultiple, maxFactorMultiple, allowReps=False):
         # Multiply whole expression by multiple to make more difficult
         extMultFactor = rd.randint(1, maxFactorMultiple)
 
-        # Setup expression
-        finExpression = func(coeffFactor * x) == solSide
-        dispExpression = (
-            extMultFactor * func(coeffFactor * x) == solSide * extMultFactor
-        )
-
-        # Find first solution (as it is a general solution question)
-        firstSol = solve(finExpression, x)
-
         # Generate signature to reject duplicates
-        signature = ("general", funcName, finExpression, firstSol)
+        signature = ("general", funcName, coeffFactor, solSide)
         if not allowReps and signature in usedSigs:
             continue
 
         # Add to signatures to prevent this one from being generated again
         usedSigs.add(signature)
 
-        # LaTeX formatting
-        questionText = f"Find the general solution for: $\\displaystyle{extMultFactor}{funcLatex}\\left({coeffFactor}x\\right) = {solSide * extMultFactor}$"
-
+        # Find reference angle (use sympy arc* functions)
         if funcName == "sin":
-            answerText = f"$2/{coeffFactor} \\pi n + {firstSol} (2/{coeffFactor}n+1)\\pi - {firstSol}$"
+            refAngle = simplify(asin(solSide))
+            answerText = f"$x = {simplify((refAngle + 2 * pi * N) / coeffFactor)} \\text{{or}} {simplify(2 * pi * (N + 1) - refAngle / coeffFactor)}, n \\in \\mathbb{{Z}}$"
         elif funcName == "cos":
-            answerText = f"$2/{coeffFactor} \\pi n \\pm {firstSol}$"
-        elif funcName == "tan":
-            answerText = f"$1/{coeffFactor} \\pi n \\pm {firstSol}$"
+            refAngle = simplify(acos(solSide))
+            answerText = f"$x = {simplify((2 * pi * N) / coeffFactor)} \\pm {simplify(refAngle / coeffFactor)}, n \\in \\mathbb{{Z}}$"
+        else:
+            refAngle = simplify(atan(solSide))
+            answerText = f"$x = {simplify((pi * N) / coeffFactor)} + {simplify(refAngle / coeffFactor)}, n \\in \\mathbb{{Z}}$"
 
-        answerText = f"${latex(value)}$"
+        # LaTeX formatting
+        questionText = f"Find the general solution for: $\\displaystyle {latex(Eq(extMultFactor * func(coeffFactor * X), extMultFactor * solSide))}$"
 
         return {
             "question": questionText,
@@ -193,7 +207,10 @@ def build_question_set(nQuestions, maxAngle):
     poolExhausted = False
 
     for _ in range(nQuestions):
-        q = genprob_exact_val(maxAngle, usedSigs)
+        if rd.randint(0, 1) == 1:
+            q = genprob_gen_solution(3, 5, usedSigs)
+        else:
+            q = genprob_exact_val(maxAngle, usedSigs)
 
         if q is None:
             if not poolExhausted:
