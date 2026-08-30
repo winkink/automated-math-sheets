@@ -49,6 +49,23 @@ NICE_DENOMINATORS = [1, 2, 3, 4, 6]
 MAX_GEN_ATTEMPTS_PER_Q = 300  # retries allowed before accepting a duplicate
 
 TRIG_FUNCS = {"sin": (sin, "\\sin"), "cos": (cos, "\\cos"), "tan": (tan, "\\tan")}
+TRIG_FUNCS_GENSOL = {
+    "sin": (
+        sin,
+        "\\sin",
+        [0, 1 / 2, sqrt(2) / 2, sqrt(3) / 2, 1],
+    ),
+    "cos": (
+        cos,
+        "\\cos",
+        [0, 1 / 2, sqrt(2) / 2, sqrt(3) / 2, 1],
+    ),
+    "tan": (
+        tan,
+        "\\tan",
+        [0, sqrt(3) / 3, 1, sqrt(3)],
+    ),
+}
 TRIG_FUNC_NAMES = list(TRIG_FUNCS.keys())
 
 
@@ -77,9 +94,12 @@ def genprob_exact_val(maxAngle, usedSigs, allowReps=False):
         numerSim, denomSim = frac.numerator, frac.denominator
 
         # Reject duplicates
-        signature = (funcName, numerSim, denomSim)
+        signature = ("exact", funcName, numerSim, denomSim)
         if not allowReps and signature in usedSigs:
             continue
+
+        # Add to signatures to prevent this one from being generated again
+        usedSigs.add(signature)
 
         # TODO:
         # Multiply fraction to make bigger (additional challenge)
@@ -89,9 +109,6 @@ def genprob_exact_val(maxAngle, usedSigs, allowReps=False):
         # Generate the angle
         angle = Rational(numerSim, denomSim) * pi
         value = sp.simplify(func(angle))
-
-        # Add to signatures to prevent this one from being generated again
-        usedSigs.add(signature)
 
         # LaTeX formatting
         angleTex = latex(Rational(numer, denom) * pi)
@@ -103,6 +120,59 @@ def genprob_exact_val(maxAngle, usedSigs, allowReps=False):
             answerText = "Undefined"
         else:
             answerText = f"${latex(value)}$"
+
+        return {
+            "question": questionText,
+            "answer": answerText,
+        }
+
+    # If too many questions where generated
+    return None
+
+
+def genprob_gen_solution(maxCoeffMultiple, maxFactorMultiple, allowReps=False):
+    for _ in range(MAX_GEN_ATTEMPTS_PER_Q):
+        # Pick a trig function
+        funcName = rd.choice(TRIG_FUNC_NAMES)
+        func, funcLatex, possAns = TRIG_FUNCS_GENSOL[funcName]
+
+        # Pick a final solution to equate to
+        solSide = rd.choice(possAns)
+
+        # Multiply coeff with random factor (keep positive for now)
+        coeffFactor = rd.randint(1, maxCoeffMultiple)
+
+        # Multiply whole expression by multiple to make more difficult
+        extMultFactor = rd.randint(1, maxFactorMultiple)
+
+        # Setup expression
+        finExpression = func(coeffFactor * x) == solSide
+        dispExpression = (
+            extMultFactor * func(coeffFactor * x) == solSide * extMultFactor
+        )
+
+        # Find first solution (as it is a general solution question)
+        firstSol = solve(finExpression, x)
+
+        # Generate signature to reject duplicates
+        signature = ("general", funcName, finExpression, firstSol)
+        if not allowReps and signature in usedSigs:
+            continue
+
+        # Add to signatures to prevent this one from being generated again
+        usedSigs.add(signature)
+
+        # LaTeX formatting
+        questionText = f"Find the general solution for: $\\displaystyle{extMultFactor}{funcLatex}\\left({coeffFactor}x\\right) = {solSide * extMultFactor}$"
+
+        if funcName == "sin":
+            answerText = f"$2/{coeffFactor} \\pi n + {firstSol} (2/{coeffFactor}n+1)\\pi - {firstSol}$"
+        elif funcName == "cos":
+            answerText = f"$2/{coeffFactor} \\pi n \\pm {firstSol}$"
+        elif funcName == "tan":
+            answerText = f"$1/{coeffFactor} \\pi n \\pm {firstSol}$"
+
+        answerText = f"${latex(value)}$"
 
         return {
             "question": questionText,
