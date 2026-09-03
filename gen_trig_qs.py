@@ -52,6 +52,7 @@ MAX_ANGLE_MULTIPLE = 4  # max range for angles used in "exact value" /
 SEED = None  # set an int here for reproducible runs, else None
 OUTPUT_FILE = "trig_questions.tex"
 
+# EXACT SOLUTIONS QUESTIONS
 # Denominators that yield "nice" (closed-form, textbook-standard) exact trig
 # values when combined with pi. True arbitrary rational multiples of pi do
 # NOT generally have closed-form exact values (this is a real mathematical
@@ -59,6 +60,18 @@ OUTPUT_FILE = "trig_questions.tex"
 # drawn from this set of denominators, scaled up to MAX_ANGLE_MULTIPLE.
 NICE_DENOMINATORS = [1, 2, 3, 4, 6]
 MAX_GEN_ATTEMPTS_PER_Q = 300  # retries allowed before accepting a duplicate
+
+# GENERAL SOLUTION QUESTIONS
+MAX_COEFF_MULTIPLE = (
+    3  # The maximum value the coefficient in front of the function can take
+)
+MAX_FACTOR_MULTIPLE = (
+    5  # The maximum value the expression can be multiplied by on both sides
+)
+
+# ---------------------------------------------------------------------------
+# CONSTANTS
+# ---------------------------------------------------------------------------
 
 TRIG_FUNCS = {"sin": (sin, "\\sin"), "cos": (cos, "\\cos"), "tan": (tan, "\\tan")}
 TRIG_FUNC_NAMES = list(TRIG_FUNCS.keys())
@@ -91,6 +104,8 @@ N = Symbol("n", integer=True)
 # ---------------------------------------------------------------------------
 # HELPER FUNCTIONS
 # ---------------------------------------------------------------------------
+
+
 def genprob_exact_val(maxAngle, usedSigs, allowReps=False):
     for _ in range(MAX_GEN_ATTEMPTS_PER_Q):
         # Pick a trig function
@@ -155,7 +170,7 @@ def genprob_gen_solution(
     for _ in range(MAX_GEN_ATTEMPTS_PER_Q):
         # Pick a trig function
         funcName = rd.choice(TRIG_FUNC_NAMES)
-        func, funcLatex, possAns = TRIG_FUNCS_GENSOL[funcName]
+        func, _, possAns = TRIG_FUNCS_GENSOL[funcName]
 
         # Pick a final solution to equate to
         solSide = rd.choice(possAns)
@@ -200,7 +215,7 @@ def genprob_gen_solution(
 # ---------------------------------------------------------------------------
 # BUILD QUESTIONS
 # ---------------------------------------------------------------------------
-def build_question_set(nQuestions, maxAngle):
+def build_question_set(nQuestions, maxAngle, maxCoeffMultiple, maxFactorMultiple):
     questions = []
     warnMessages = []
     usedSigs = set()
@@ -208,8 +223,10 @@ def build_question_set(nQuestions, maxAngle):
 
     for _ in range(nQuestions):
         if rd.randint(0, 1) == 1:
-            q = genprob_gen_solution(3, 5, usedSigs)
+            questionType = "genSolution"
+            q = genprob_gen_solution(maxCoeffMultiple, maxFactorMultiple, usedSigs)
         else:
+            questionType = "exactVal"
             q = genprob_exact_val(maxAngle, usedSigs)
 
         if q is None:
@@ -218,7 +235,12 @@ def build_question_set(nQuestions, maxAngle):
                     "Requested number of questions exceeds pool of unique exact-value questions given the max angle multiple. Repeats will occur..."
                 )
                 poolExhausted = True
-            q = genprob_exact_val(maxAngle, usedSigs, poolExhausted)
+            if questionType == "genSolution":
+                q = genprob_gen_solution(
+                    maxCoeffMultiple, maxFactorMultiple, usedSigs, poolExhausted
+                )
+            elif questionType == "exactVal":
+                q = genprob_exact_val(maxAngle, usedSigs, poolExhausted)
 
         if q is None:
             # No question could be made for this angle
@@ -289,14 +311,6 @@ def build_latex_document(questions, warnMessages):
 
 
 def main():
-    # tempSigs = set()
-    #
-    # for i in range(10):
-    #     qSet = genprob_exact_val(MAX_ANGLE_MULTIPLE, tempSigs)
-    #
-    #     if qSet is not None:
-    #         print(f"Generated question {i}: {qSet['question']} -> {qSet['answer']}")
-
     parser = argparse.ArgumentParser(
         description="Generate randomised trig questions as LaTeX."
     )
@@ -305,6 +319,18 @@ def main():
         type=int,
         default=NUM_QUESTIONS,
         help="Number of questions to generate.",
+    )
+    parser.add_argument(
+        "--max-coeff-multiple",
+        type=int,
+        default=MAX_COEFF_MULTIPLE,
+        help="Max coefficient value for general solution questions",
+    )
+    parser.add_argument(
+        "--max-factor-multiple",
+        type=int,
+        default=MAX_FACTOR_MULTIPLE,
+        help="Maximum factor to multiply both sides of expression by for general solution questions",
     )
     parser.add_argument(
         "--max-angle-multiple",
@@ -327,7 +353,10 @@ def main():
         rd.seed(args.seed)
 
     questions, warnings = build_question_set(
-        args.num_questions, args.max_angle_multiple
+        args.num_questions,
+        args.max_angle_multiple,
+        args.max_coeff_multiple,
+        args.max_factor_multiple,
     )
 
     document = build_latex_document(questions, warnings)
