@@ -52,15 +52,6 @@ MAX_ANGLE_MULTIPLE = 4  # max range for angles used in "exact value" /
 SEED = None  # set an int here for reproducible runs, else None
 OUTPUT_FILE = "trig_questions.tex"
 
-# EXACT SOLUTIONS QUESTIONS
-# Denominators that yield "nice" (closed-form, textbook-standard) exact trig
-# values when combined with pi. True arbitrary rational multiples of pi do
-# NOT generally have closed-form exact values (this is a real mathematical
-# limitation, not a script limitation), so exact-value/equation questions are
-# drawn from this set of denominators, scaled up to MAX_ANGLE_MULTIPLE.
-NICE_DENOMINATORS = [1, 2, 3, 4, 6]
-MAX_GEN_ATTEMPTS_PER_Q = 300  # retries allowed before accepting a duplicate
-
 # GENERAL SOLUTION QUESTIONS
 MAX_COEFF_MULTIPLE = (
     3  # The maximum value the coefficient in front of the function can take
@@ -72,6 +63,14 @@ MAX_FACTOR_MULTIPLE = (
 # ---------------------------------------------------------------------------
 # CONSTANTS
 # ---------------------------------------------------------------------------
+# EXACT SOLUTIONS QUESTIONS
+# Denominators that yield "nice" (closed-form, textbook-standard) exact trig
+# values when combined with pi. True arbitrary rational multiples of pi do
+# NOT generally have closed-form exact values (this is a real mathematical
+# limitation, not a script limitation), so exact-value/equation questions are
+# drawn from this set of denominators, scaled up to MAX_ANGLE_MULTIPLE.
+NICE_DENOMINATORS = [1, 2, 3, 4, 6]
+MAX_GEN_ATTEMPTS_PER_Q = 300  # retries allowed before accepting a duplicate
 
 TRIG_FUNCS = {"sin": (sin, "\\sin"), "cos": (cos, "\\cos"), "tan": (tan, "\\tan")}
 TRIG_FUNC_NAMES = list(TRIG_FUNCS.keys())
@@ -210,6 +209,25 @@ def genprob_gen_solution(
 
     # If too many questions where generated
     return None
+
+
+def genprob_trig_sketch():
+    for _ in range(MAX_GEN_ATTEMPTS_PER_Q):
+        # Pick a trig function
+        funcName = rd.choice(TRIG_FUNC_NAMES)
+        func, _, _ = TRIG_FUNCS_GENSOL[funcName]
+
+        # Multiply coeff with random factor (keep positive for now)
+        coeffFactor = rd.randint(1, maxCoeffMultiple)
+
+        # Determine amplitude
+        extMultFactor = rd.randint(1, maxFactorMultiple)
+
+        # Determine translation (horizontal)
+        horTrans = rd.randint(-maxHorizontal, maxHorizontal)
+
+        # Determine translation (vertical)
+        verTrans = rd.randint(-maxVertical, maxVertical)
 
 
 # ---------------------------------------------------------------------------
