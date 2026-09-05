@@ -193,7 +193,7 @@ def genprob_gen_solution(
         # Find reference angle (use sympy arc* functions)
         if funcName == "sin":
             refAngle = simplify(asin(solSide))
-            answerText = f"$\\displaystyle x = {latex(expand((refAngle + 2 * pi * N) / coeffFactor))} \\text{{ or }} {latex(expand(pi * (2 * N + 1) - refAngle / coeffFactor))}, n \\in \\mathbb{{Z}}$"
+            answerText = f"$\\displaystyle x = {latex(expand((refAngle + 2 * pi * N) / coeffFactor))} \\text{{ or }} {latex(expand((pi * (2 * N + 1) - refAngle) / coeffFactor))}, n \\in \\mathbb{{Z}}$"
         elif funcName == "cos":
             refAngle = simplify(acos(solSide))
             answerText = f"$\\displaystyle x = {latex(simplify((2 * pi * N) / coeffFactor))} \\pm {latex(simplify(refAngle / coeffFactor))}, n \\in \\mathbb{{Z}}$"
