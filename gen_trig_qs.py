@@ -99,6 +99,9 @@ TRIG_FUNCS_GENSOL = {
 X = Symbol("x")
 N = Symbol("n", integer=True)
 
+# For plotting
+Y = Symbol("y")
+
 
 # ---------------------------------------------------------------------------
 # HELPER FUNCTIONS
@@ -126,7 +129,7 @@ def genprob_exact_val(maxAngle, usedSigs, allowReps=False):
         frac = Fraction(numer, denom)
         numerSim, denomSim = frac.numerator, frac.denominator
 
-        # Reject duplicates
+        # Reject duplicates - where loop occurs
         signature = ("exact", funcName, numerSim, denomSim)
         if not allowReps and signature in usedSigs:
             continue
@@ -211,11 +214,18 @@ def genprob_gen_solution(
     return None
 
 
-def genprob_trig_sketch():
+def genprob_trig_sketch(
+    maxCoeffMultiple,
+    maxFactorMultiple,
+    maxHorizontal,
+    maxVertical,
+    usedSigs,
+    allowReps=False,
+):
     for _ in range(MAX_GEN_ATTEMPTS_PER_Q):
         # Pick a trig function
         funcName = rd.choice(TRIG_FUNC_NAMES)
-        func, _, _ = TRIG_FUNCS_GENSOL[funcName]
+        func, funcLatex, _ = TRIG_FUNCS_GENSOL[funcName]
 
         # Multiply coeff with random factor (keep positive for now)
         coeffFactor = rd.randint(1, maxCoeffMultiple)
@@ -228,6 +238,19 @@ def genprob_trig_sketch():
 
         # Determine translation (vertical)
         verTrans = rd.randint(-maxVertical, maxVertical)
+
+        # Generate signature to reject duplicates
+        signature = ("sketch", func, coeffFactor, extMultFactor, horTrans, verTrans)
+        if not allowReps and signature in usedSigs:
+            continue
+
+        # Finalise expression
+        # finExpression = extMultFactor * func(coeffFactor * X + horTrans) + verTrans
+
+        # LaTeX formatting
+        questionText = f"Sketch the following for one cycle: $\\displaystyle {latex(Eq(Y, extMultFactor * func(coeffFactor * X + horTrans) + verTrans))}$"
+        print(questionText)
+        return
 
 
 # ---------------------------------------------------------------------------
@@ -329,62 +352,67 @@ def build_latex_document(questions, warnMessages):
 
 
 def main():
-    parser = argparse.ArgumentParser(
-        description="Generate randomised trig questions as LaTeX."
-    )
-    parser.add_argument(
-        "--num-questions",
-        type=int,
-        default=NUM_QUESTIONS,
-        help="Number of questions to generate.",
-    )
-    parser.add_argument(
-        "--max-coeff-multiple",
-        type=int,
-        default=MAX_COEFF_MULTIPLE,
-        help="Max coefficient value for general solution questions",
-    )
-    parser.add_argument(
-        "--max-factor-multiple",
-        type=int,
-        default=MAX_FACTOR_MULTIPLE,
-        help="Maximum factor to multiply both sides of expression by for general solution questions",
-    )
-    parser.add_argument(
-        "--max-angle-multiple",
-        type=int,
-        default=MAX_ANGLE_MULTIPLE,
-        help="Max angle range as a multiple of pi (e.g. 4 -> [0, 4*pi)).",
-    )
-    parser.add_argument(
-        "--seed",
-        type=int,
-        default=SEED,
-        help="Random seed for reproducible output (omit for a new random set each run).",
-    )
-    parser.add_argument(
-        "--output", type=str, default=OUTPUT_FILE, help="Output .tex file path."
-    )
-    args = parser.parse_args()
+    usedSigs = []
+    genprob_trig_sketch(1, 1, 1, 1, usedSigs)
 
-    if args.seed is not None:
-        rd.seed(args.seed)
 
-    questions, warnings = build_question_set(
-        args.num_questions,
-        args.max_angle_multiple,
-        args.max_coeff_multiple,
-        args.max_factor_multiple,
-    )
-
-    document = build_latex_document(questions, warnings)
-
-    with open(args.output, "w") as f:
-        f.write(document)
-
-    print(f"Wrote {len(questions)} questions to {args.output}")
-    for w in warnings:
-        print(f"WARNING: {w}")
+# def main():
+#     parser = argparse.ArgumentParser(
+#         description="Generate randomised trig questions as LaTeX."
+#     )
+#     parser.add_argument(
+#         "--num-questions",
+#         type=int,
+#         default=NUM_QUESTIONS,
+#         help="Number of questions to generate.",
+#     )
+#     parser.add_argument(
+#         "--max-coeff-multiple",
+#         type=int,
+#         default=MAX_COEFF_MULTIPLE,
+#         help="Max coefficient value for general solution questions",
+#     )
+#     parser.add_argument(
+#         "--max-factor-multiple",
+#         type=int,
+#         default=MAX_FACTOR_MULTIPLE,
+#         help="Maximum factor to multiply both sides of expression by for general solution questions",
+#     )
+#     parser.add_argument(
+#         "--max-angle-multiple",
+#         type=int,
+#         default=MAX_ANGLE_MULTIPLE,
+#         help="Max angle range as a multiple of pi (e.g. 4 -> [0, 4*pi)).",
+#     )
+#     parser.add_argument(
+#         "--seed",
+#         type=int,
+#         default=SEED,
+#         help="Random seed for reproducible output (omit for a new random set each run).",
+#     )
+#     parser.add_argument(
+#         "--output", type=str, default=OUTPUT_FILE, help="Output .tex file path."
+#     )
+#     args = parser.parse_args()
+#
+#     if args.seed is not None:
+#         rd.seed(args.seed)
+#
+#     questions, warnings = build_question_set(
+#         args.num_questions,
+#         args.max_angle_multiple,
+#         args.max_coeff_multiple,
+#         args.max_factor_multiple,
+#     )
+#
+#     document = build_latex_document(questions, warnings)
+#
+#     with open(args.output, "w") as f:
+#         f.write(document)
+#
+#     print(f"Wrote {len(questions)} questions to {args.output}")
+#     for w in warnings:
+#         print(f"WARNING: {w}")
 
 
 if __name__ == "__main__":
