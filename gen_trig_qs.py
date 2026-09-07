@@ -35,12 +35,14 @@ from sympy import (
     atan,
     cos,
     latex,
+    per,
     pi,
     simplify,
     sin,
     sqrt,
     tan,
 )
+from sympy.polys.polyoptions import Frac
 
 # ---------------------------------------------------------------------------
 # CONFIGURATION VARIABLES (defaults; can be overridden via CLI flags below)
@@ -59,6 +61,9 @@ MAX_COEFF_MULTIPLE = (
 MAX_FACTOR_MULTIPLE = (
     5  # The maximum value the expression can be multiplied by on both sides
 )
+
+GRAPH_HEIGHT = "7cm"
+PADDING = 2
 
 # ---------------------------------------------------------------------------
 # CONSTANTS
@@ -245,12 +250,113 @@ def genprob_trig_sketch(
             continue
 
         # Finalise expression
-        # finExpression = extMultFactor * func(coeffFactor * X + horTrans) + verTrans
+        finExpression = (
+            f"{extMultFactor} * {func}({coeffFactor} * x + {horTrans}) + {verTrans}"
+        )
 
         # LaTeX formatting
-        questionText = f"Sketch the following for one cycle: $\\displaystyle {latex(Eq(Y, extMultFactor * func(coeffFactor * X + horTrans) + verTrans))}$"
-        print(questionText)
-        return
+        questionText = []
+        answerText = []
+        questionText.extend(
+            [
+                f"Sketch the following for one cycle: $\\displaystyle {latex(Eq(Y, extMultFactor * func(coeffFactor * X + horTrans) + verTrans))}$",
+                "",
+            ]
+        )
+
+        xminVal, xmaxVal, yminVal, ymaxVal, domMin, domMax = trig_graph_solver(
+            funcName, coeffFactor, extMultFactor, horTrans, verTrans
+        )
+        questionText.extend(
+            return_latex_graph(
+                xminVal, xmaxVal, yminVal, ymaxVal, domMin, domMax, False
+            )
+        )
+        answerText.extend(
+            return_latex_graph(
+                xminVal, xmaxVal, yminVal, ymaxVal, domMin, domMax, finExpression, True
+            )
+        )
+
+        return {"question": "\n".join(questionText), "answer": "\n".join(answerText)}
+
+    # If too many questions where generated
+    return None
+
+
+# Graph solving
+def trig_graph_solver(funcName, coeffFactor, extMultFactor, horTrans, verTrans):
+    basePeriodCoeff = Fraction(2) if funcName in ("sin", "cos") else Fraction(1)
+    periodFull = basePeriodCoeff / coeffFactor
+    periodPart = periodFull / 4
+
+    padding = PADDING
+
+    # Calculate results
+    domMin = f"{0}*pi - {Fraction(horTrans, coeffFactor)}"
+    domMax = f"{periodFull}*pi - {Fraction(horTrans, coeffFactor)}"
+
+    xminVal = f"({0}*pi - {padding})"
+    xmaxVal = f"({domMax}*pi + {padding})"
+
+    yminVal = -extMultFactor + verTrans
+    ymaxVal = extMultFactor + verTrans
+
+    return xminVal, xmaxVal, yminVal, ymaxVal, domMin, domMax
+
+
+def return_latex_graph(
+    xminVal,
+    xmaxVal,
+    yminVal,
+    ymaxVal,
+    domMin,
+    domMax,
+    plotExpr,
+    answerOut=False,
+):
+    # Make a list of lines to print
+    lines = []
+
+    # Open tikzpicture object
+    lines.extend(
+        [
+            "\\begin{tikzpicture}",
+            "\\begin{axis}[",
+            "   xlabel=$x$, ylabel=$y$, axis lines=middle,",
+        ]
+    )
+
+    if answerOut:
+        lines.extend(
+            [
+                "   xtick=\\empty,",
+                "   ytick=\\empty,",
+                f"   xmin=({simplify(xminVal)}), xmax=({simplify(xmaxVal)}),",
+                f"   ymin={yminVal}, ymax={ymaxVal},",
+                f"   domain=({simplify(domMin)}):({simplify(domMax)}), trig format plots=rad,",
+                f"   width=\\linewidth, height={GRAPH_HEIGHT}",
+                "]",
+                f"\\addplot[thick, blue, samples=250] {{{plotExpr}}};",
+            ]
+        )
+    else:
+        lines.extend(
+            [
+                "   xtick=\\empty,",
+                "   ytick=\\empty,",
+                "   xmin=-1, xmax=2*pi,",
+                "   ymin=-3, ymax=3,",
+                "   domain=0:2*pi, trig format plots=rad,",
+                f"   width=\\linewidth, height={GRAPH_HEIGHT}",
+                "]",
+            ]
+        )
+
+    # Close tikzpicture object
+    lines.extend(["\\end{axis}", "\\end{tikzpicture}"])
+
+    return lines
 
 
 # ---------------------------------------------------------------------------
@@ -262,35 +368,37 @@ def build_question_set(nQuestions, maxAngle, maxCoeffMultiple, maxFactorMultiple
     usedSigs = set()
     poolExhausted = False
 
-    for _ in range(nQuestions):
-        if rd.randint(0, 1) == 1:
-            questionType = "genSolution"
-            q = genprob_gen_solution(maxCoeffMultiple, maxFactorMultiple, usedSigs)
-        else:
-            questionType = "exactVal"
-            q = genprob_exact_val(maxAngle, usedSigs)
+    q = genprob_trig_sketch(maxCoeffMultiple, maxFactorMultiple, 2, 5, usedSigs)
 
-        if q is None:
-            if not poolExhausted:
-                warnMessages.append(
-                    "Requested number of questions exceeds pool of unique exact-value questions given the max angle multiple. Repeats will occur..."
-                )
-                poolExhausted = True
-            if questionType == "genSolution":
-                q = genprob_gen_solution(
-                    maxCoeffMultiple, maxFactorMultiple, usedSigs, poolExhausted
-                )
-            elif questionType == "exactVal":
-                q = genprob_exact_val(maxAngle, usedSigs, poolExhausted)
-
-        if q is None:
-            # No question could be made for this angle
-            warnMessages.append(
-                "Could not generate a valid exact-value for the given max angle multiple; skipping..."
-            )
-            continue
-
-        questions.append(q)
+    # for _ in range(nQuestions):
+    #     if rd.randint(0, 1) == 1:
+    #         questionType = "genSolution"
+    #         q = genprob_gen_solution(maxCoeffMultiple, maxFactorMultiple, usedSigs)
+    #     else:
+    #         questionType = "exactVal"
+    #         q = genprob_exact_val(maxAngle, usedSigs)
+    #
+    #     if q is None:
+    #         if not poolExhausted:
+    #             warnMessages.append(
+    #                 "Requested number of questions exceeds pool of unique exact-value questions given the max angle multiple. Repeats will occur..."
+    #             )
+    #             poolExhausted = True
+    #         if questionType == "genSolution":
+    #             q = genprob_gen_solution(
+    #                 maxCoeffMultiple, maxFactorMultiple, usedSigs, poolExhausted
+    #             )
+    #         elif questionType == "exactVal":
+    #             q = genprob_exact_val(maxAngle, usedSigs, poolExhausted)
+    #
+    #     if q is None:
+    #         # No question could be made for this angle
+    #         warnMessages.append(
+    #             "Could not generate a valid exact-value for the given max angle multiple; skipping..."
+    #         )
+    #         continue
+    #
+    questions.append(q)
 
     return questions, warnMessages
 
@@ -304,13 +412,15 @@ LATEX_PREAMBLE = r"""\documentclass[11pt]{article}
 \usepackage{amssymb}
 \usepackage[margin=1in]{geometry}
 \usepackage{enumitem}
-
-\title{Trigonometry Practice Questions}
-\author{}
-\date{}
+\usepackage{pgfplots}
+\pgfplotsset{compat=1.18}
 
 \begin{document}
-\maketitle
+\begin{center}
+    {\LARGE\bfseries Exact Trigonometric Values}\\[0.5em]
+    Give all answers in exact form. All angles are in radians.
+    Note ``arc'' refers to inverse. (\textit{i.e.}\ $\arcsin = \sin^{-1}$)
+\end{center}
 
 \section*{Questions}
 \begin{enumerate}[label=\arabic*.]
@@ -352,67 +462,63 @@ def build_latex_document(questions, warnMessages):
 
 
 def main():
-    usedSigs = []
-    genprob_trig_sketch(1, 1, 1, 1, usedSigs)
+    parser = argparse.ArgumentParser(
+        description="Generate randomised trig questions as LaTeX."
+    )
+    parser.add_argument(
+        "--num-questions",
+        type=int,
+        default=NUM_QUESTIONS,
+        help="Number of questions to generate.",
+    )
+    parser.add_argument(
+        "--max-coeff-multiple",
+        type=int,
+        default=MAX_COEFF_MULTIPLE,
+        help="Max coefficient value for general solution questions",
+    )
+    parser.add_argument(
+        "--max-factor-multiple",
+        type=int,
+        default=MAX_FACTOR_MULTIPLE,
+        help="Maximum factor to multiply both sides of expression by for general solution questions",
+    )
+    parser.add_argument(
+        "--max-angle-multiple",
+        type=int,
+        default=MAX_ANGLE_MULTIPLE,
+        help="Max angle range as a multiple of pi (e.g. 4 -> [0, 4*pi)).",
+    )
+    parser.add_argument(
+        "-s",
+        "--seed",
+        type=int,
+        default=SEED,
+        help="Random seed for reproducible output (omit for a new random set each run).",
+    )
+    parser.add_argument(
+        "--output", type=str, default=OUTPUT_FILE, help="Output .tex file path."
+    )
+    args = parser.parse_args()
 
+    if args.seed is not None:
+        rd.seed(args.seed)
 
-# def main():
-#     parser = argparse.ArgumentParser(
-#         description="Generate randomised trig questions as LaTeX."
-#     )
-#     parser.add_argument(
-#         "--num-questions",
-#         type=int,
-#         default=NUM_QUESTIONS,
-#         help="Number of questions to generate.",
-#     )
-#     parser.add_argument(
-#         "--max-coeff-multiple",
-#         type=int,
-#         default=MAX_COEFF_MULTIPLE,
-#         help="Max coefficient value for general solution questions",
-#     )
-#     parser.add_argument(
-#         "--max-factor-multiple",
-#         type=int,
-#         default=MAX_FACTOR_MULTIPLE,
-#         help="Maximum factor to multiply both sides of expression by for general solution questions",
-#     )
-#     parser.add_argument(
-#         "--max-angle-multiple",
-#         type=int,
-#         default=MAX_ANGLE_MULTIPLE,
-#         help="Max angle range as a multiple of pi (e.g. 4 -> [0, 4*pi)).",
-#     )
-#     parser.add_argument(
-#         "--seed",
-#         type=int,
-#         default=SEED,
-#         help="Random seed for reproducible output (omit for a new random set each run).",
-#     )
-#     parser.add_argument(
-#         "--output", type=str, default=OUTPUT_FILE, help="Output .tex file path."
-#     )
-#     args = parser.parse_args()
-#
-#     if args.seed is not None:
-#         rd.seed(args.seed)
-#
-#     questions, warnings = build_question_set(
-#         args.num_questions,
-#         args.max_angle_multiple,
-#         args.max_coeff_multiple,
-#         args.max_factor_multiple,
-#     )
-#
-#     document = build_latex_document(questions, warnings)
-#
-#     with open(args.output, "w") as f:
-#         f.write(document)
-#
-#     print(f"Wrote {len(questions)} questions to {args.output}")
-#     for w in warnings:
-#         print(f"WARNING: {w}")
+    questions, warnings = build_question_set(
+        args.num_questions,
+        args.max_angle_multiple,
+        args.max_coeff_multiple,
+        args.max_factor_multiple,
+    )
+
+    document = build_latex_document(questions, warnings)
+
+    with open(args.output, "w") as f:
+        f.write(document)
+
+    print(f"Wrote {len(questions)} questions to {args.output}")
+    for w in warnings:
+        print(f"WARNING: {w}")
 
 
 if __name__ == "__main__":
