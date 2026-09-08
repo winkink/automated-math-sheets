@@ -31,18 +31,17 @@ from sympy import (
     Rational,
     Symbol,
     acos,
+    approximants,
     asin,
     atan,
     cos,
     latex,
-    per,
     pi,
     simplify,
     sin,
     sqrt,
     tan,
 )
-from sympy.polys.polyoptions import Frac
 
 # ---------------------------------------------------------------------------
 # CONFIGURATION VARIABLES (defaults; can be overridden via CLI flags below)
@@ -250,9 +249,11 @@ def genprob_trig_sketch(
             continue
 
         # Finalise expression
-        finExpression = (
+        finExpressionStr = (
             f"{extMultFactor} * {func}({coeffFactor} * x + {horTrans}) + {verTrans}"
         )
+
+        finExpression = extMultFactor * func(coeffFactor * X + horTrans) + verTrans
 
         # LaTeX formatting
         questionText = []
@@ -264,17 +265,27 @@ def genprob_trig_sketch(
             ]
         )
 
-        xminVal, xmaxVal, yminVal, ymaxVal, domMin, domMax = trig_graph_solver(
-            funcName, coeffFactor, extMultFactor, horTrans, verTrans
+        xminVal, xmaxVal, yminVal, ymaxVal, domMin, domMax, exactCoord = (
+            trig_graph_solver(
+                funcName, coeffFactor, extMultFactor, horTrans, verTrans, finExpression
+            )
         )
         questionText.extend(
             return_latex_graph(
-                xminVal, xmaxVal, yminVal, ymaxVal, domMin, domMax, False
+                xminVal, xmaxVal, yminVal, ymaxVal, domMin, domMax, None, None, False
             )
         )
         answerText.extend(
             return_latex_graph(
-                xminVal, xmaxVal, yminVal, ymaxVal, domMin, domMax, finExpression, True
+                xminVal,
+                xmaxVal,
+                yminVal,
+                ymaxVal,
+                domMin,
+                domMax,
+                finExpressionStr,
+                exactCoord,
+                True,
             )
         )
 
@@ -285,7 +296,9 @@ def genprob_trig_sketch(
 
 
 # Graph solving
-def trig_graph_solver(funcName, coeffFactor, extMultFactor, horTrans, verTrans):
+def trig_graph_solver(
+    funcName, coeffFactor, extMultFactor, horTrans, verTrans, finExpression
+):
     basePeriodCoeff = Fraction(2) if funcName in ("sin", "cos") else Fraction(1)
     periodFull = basePeriodCoeff / coeffFactor
     periodPart = periodFull / 4
@@ -299,10 +312,30 @@ def trig_graph_solver(funcName, coeffFactor, extMultFactor, horTrans, verTrans):
     xminVal = f"({0}*pi - {padding})"
     xmaxVal = f"({domMax}*pi + {padding})"
 
-    yminVal = -extMultFactor + verTrans
-    ymaxVal = extMultFactor + verTrans
+    yminVal = -extMultFactor + verTrans - padding
+    ymaxVal = extMultFactor + verTrans + padding
 
-    return xminVal, xmaxVal, yminVal, ymaxVal, domMin, domMax
+    # Coordinates for plotting
+    exactCoord = []
+    if funcName in ("sin", "cos"):
+        for i in range(5):
+            xExpr = simplify(periodPart * i * pi - Fraction(horTrans, coeffFactor))
+            yExpr = finExpression.subs(X, xExpr)
+
+            if yExpr.evalf() >= verTrans:
+                pos = "above"
+            else:
+                pos = "below"
+
+            exactCoord.append(
+                (
+                    pos,
+                    xExpr,
+                    finExpression.subs(X, xExpr),
+                )
+            )
+
+    return xminVal, xmaxVal, yminVal, ymaxVal, domMin, domMax, exactCoord
 
 
 def return_latex_graph(
@@ -313,6 +346,7 @@ def return_latex_graph(
     domMin,
     domMax,
     plotExpr,
+    plotCoordAnnot,
     answerOut=False,
 ):
     # Make a list of lines to print
@@ -340,6 +374,16 @@ def return_latex_graph(
                 f"\\addplot[thick, blue, samples=250] {{{plotExpr}}};",
             ]
         )
+
+        # Coordinates
+        for pos, xVal, yVal in plotCoordAnnot:
+            lines.extend(
+                [
+                    f"\\node[circle, fill=red, inner sep=1.5pt] at (axis cs:{xVal}, {yVal}) {{}};"
+                    f"\\node[{pos} right] at (axis cs:{xVal}, {yVal}) {{$({latex(xVal)}, {latex(yVal)})$}};",
+                ]
+            )
+
     else:
         lines.extend(
             [
