@@ -355,6 +355,7 @@ def return_latex_graph(
     # Open tikzpicture object
     lines.extend(
         [
+            "\\leavevmode \\\\",
             "\\begin{tikzpicture}",
             "\\begin{axis}[",
             "   xlabel=$x$, ylabel=$y$, axis lines=middle,",
