@@ -31,7 +31,6 @@ from sympy import (
     Rational,
     Symbol,
     acos,
-    approximants,
     asin,
     atan,
     cos,
@@ -51,7 +50,7 @@ MAX_ANGLE_MULTIPLE = 4  # max range for angles used in "exact value" /
 # "equation" questions, expressed as a multiple of pi
 # e.g. 4 means angles are drawn from [0, 4*pi)
 SEED = None  # set an int here for reproducible runs, else None
-OUTPUT_FILE = "trig_questions.tex"
+OUTPUT_FILE = "Output/trig_questions.tex"
 
 # GENERAL SOLUTION QUESTIONS
 MAX_COEFF_MULTIPLE = (
