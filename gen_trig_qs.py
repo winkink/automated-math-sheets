@@ -309,8 +309,8 @@ def trig_graph_solver(
     domMin = f"{0}*pi - {Fraction(horTrans, coeffFactor)}"
     domMax = f"{periodFull}*pi - {Fraction(horTrans, coeffFactor)}"
 
-    xminVal = f"({0}*pi - {padding})"
-    xmaxVal = f"({domMax}*pi + {padding})"
+    xminVal = f"({domMin} - {padding})"
+    xmaxVal = f"({domMax} + {padding})"
 
     yminVal = -extMultFactor + verTrans - padding
     ymaxVal = extMultFactor + verTrans + padding
