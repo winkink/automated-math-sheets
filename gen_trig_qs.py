@@ -265,12 +265,12 @@ LATEX_PREAMBLE = r"""\documentclass[11pt]{article}
 \usepackage[margin=1in]{geometry}
 \usepackage{enumitem}
 
-\title{Trigonometry Practice Questions}
-\author{}
-\date{}
-
 \begin{document}
-\maketitle
+\begin{center}
+    {\LARGE\bfseries Exact Trigonometric Values}\\[0.5em]
+    Give all answers in exact form. All angles are in radians.
+\end{center}
+
 
 \section*{Questions}
 \begin{enumerate}[label=\arabic*.]
