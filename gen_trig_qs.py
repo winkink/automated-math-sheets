@@ -262,7 +262,7 @@ def build_question_set(nQuestions, maxAngle, maxCoeffMultiple, maxFactorMultiple
 LATEX_PREAMBLE = r"""\documentclass[11pt]{article}
 \usepackage{amsmath}
 \usepackage{amssymb}
-\usepackage[margin=1in]{geometry}
+\usepackage[margin=0.5in]{geometry}
 \usepackage{enumitem}
 
 \begin{document}
