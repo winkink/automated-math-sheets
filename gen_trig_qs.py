@@ -51,7 +51,7 @@ MAX_ANGLE_MULTIPLE = 4  # max range for angles used in "exact value" /
 # "equation" questions, expressed as a multiple of pi
 # e.g. 4 means angles are drawn from [0, 4*pi)
 SEED = None  # set an int here for reproducible runs, else None
-OUTPUT_FILE = "trig_questions.tex"
+OUTPUT_FILE = "Output/trig_questions.tex"
 
 # GENERAL SOLUTION QUESTIONS
 MAX_COEFF_MULTIPLE = (
@@ -229,7 +229,7 @@ def genprob_trig_sketch(
     for _ in range(MAX_GEN_ATTEMPTS_PER_Q):
         # Pick a trig function
         funcName = rd.choice(TRIG_FUNC_NAMES)
-        func, funcLatex, _ = TRIG_FUNCS_GENSOL[funcName]
+        func, _, _ = TRIG_FUNCS_GENSOL[funcName]
 
         # Multiply coeff with random factor (keep positive for now)
         coeffFactor = rd.randint(1, maxCoeffMultiple)
@@ -265,14 +265,23 @@ def genprob_trig_sketch(
             ]
         )
 
-        xminVal, xmaxVal, yminVal, ymaxVal, domMin, domMax, exactCoord = (
+        xminVal, xmaxVal, yminVal, ymaxVal, domMin, domMax, exactCoord, asymptotes = (
             trig_graph_solver(
                 funcName, coeffFactor, extMultFactor, horTrans, verTrans, finExpression
             )
         )
         questionText.extend(
             return_latex_graph(
-                xminVal, xmaxVal, yminVal, ymaxVal, domMin, domMax, None, None, False
+                xminVal,
+                xmaxVal,
+                yminVal,
+                ymaxVal,
+                domMin,
+                domMax,
+                None,
+                None,
+                None,
+                False,
             )
         )
         answerText.extend(
@@ -285,6 +294,7 @@ def genprob_trig_sketch(
                 domMax,
                 finExpressionStr,
                 exactCoord,
+                asymptotes,
                 True,
             )
         )
@@ -307,7 +317,11 @@ def trig_graph_solver(
 
     # Calculate results
     domMin = f"{0}*pi - {Fraction(horTrans, coeffFactor)}"
-    domMax = f"{periodFull}*pi - {Fraction(horTrans, coeffFactor)}"
+    domMax = (
+        f"{periodFull}*pi - {Fraction(horTrans, coeffFactor)}"
+        if funcName in ("sin", "cos")
+        else f"{periodFull}*2*pi - {Fraction(horTrans, coeffFactor)}"
+    )
 
     xminVal = f"({domMin} - {padding})"
     xmaxVal = f"({domMax} + {padding})"
@@ -315,27 +329,52 @@ def trig_graph_solver(
     yminVal = -extMultFactor + verTrans - padding
     ymaxVal = extMultFactor + verTrans + padding
 
+    # TODO: Recode such that xExpr is a list of x-values. Could incorporate x and y intercepts easier
     # Coordinates for plotting
     exactCoord = []
+    asymptotes = []
     if funcName in ("sin", "cos"):
         for i in range(5):
             xExpr = simplify(periodPart * i * pi - Fraction(horTrans, coeffFactor))
             yExpr = finExpression.subs(X, xExpr)
 
             if yExpr.evalf() >= verTrans:
-                pos = "above"
+                if i == 0:
+                    pos = "above left"
+                else:
+                    pos = "above right"
             else:
-                pos = "below"
+                pos = "below right"
 
             exactCoord.append(
                 (
                     pos,
                     xExpr,
-                    finExpression.subs(X, xExpr),
+                    yExpr,
+                )
+            )
+    else:
+        for i in range(3):
+            xExpr = simplify((periodFull * i) * pi - Fraction(horTrans, coeffFactor))
+            yExpr = finExpression.subs(X, xExpr)
+
+            pos = "below right"
+
+            exactCoord.append(
+                (
+                    pos,
+                    xExpr,
+                    yExpr,
                 )
             )
 
-    return xminVal, xmaxVal, yminVal, ymaxVal, domMin, domMax, exactCoord
+        for i in range(2):
+            asymptotes.append(
+                simplify(periodFull * i + periodFull / 2) * pi
+                - Fraction(horTrans, coeffFactor)
+            )
+
+    return xminVal, xmaxVal, yminVal, ymaxVal, domMin, domMax, exactCoord, asymptotes
 
 
 def return_latex_graph(
@@ -346,7 +385,8 @@ def return_latex_graph(
     domMin,
     domMax,
     plotExpr,
-    plotCoordAnnot,
+    exactCoord,
+    asymptotes,
     answerOut=False,
 ):
     # Make a list of lines to print
@@ -370,18 +410,39 @@ def return_latex_graph(
                 f"   xmin=({simplify(xminVal)}), xmax=({simplify(xmaxVal)}),",
                 f"   ymin={yminVal}, ymax={ymaxVal},",
                 f"   domain=({simplify(domMin)}):({simplify(domMax)}), trig format plots=rad,",
-                f"   width=\\linewidth, height={GRAPH_HEIGHT}",
+                f"   width=\\linewidth, height={GRAPH_HEIGHT},",
+            ]
+        )
+
+        # Handle the tan edge case for plotting asymptotes
+        if asymptotes:
+            lines.extend(
+                [
+                    f"   restrict y to domain={yminVal}:{ymaxVal},",
+                    "   unbounded coords=jump,",
+                ]
+            )
+
+        lines.extend(
+            [
                 "]",
                 f"\\addplot[thick, blue, samples=250] {{{plotExpr}}};",
             ]
         )
 
         # Coordinates
-        for pos, xVal, yVal in plotCoordAnnot:
+        for pos, xVal, yVal in exactCoord:
             lines.extend(
                 [
                     f"\\node[circle, fill=red, inner sep=1.5pt] at (axis cs:{xVal}, {yVal}) {{}};"
-                    f"\\node[{pos} right] at (axis cs:{xVal}, {yVal}) {{$({latex(xVal)}, {latex(yVal)})$}};",
+                    f"\\node[{pos}] at (axis cs:{xVal}, {yVal}) {{$({latex(xVal)}, {latex(yVal)})$}};",
+                ]
+            )
+
+        for asympX in asymptotes:
+            lines.extend(
+                [
+                    f"\\draw[dotted, thick, gray] (axis cs: {asympX}, {yminVal}) -- (axis cs:{asympX}, {ymaxVal});"
                 ]
             )
 
@@ -413,37 +474,39 @@ def build_question_set(nQuestions, maxAngle, maxCoeffMultiple, maxFactorMultiple
     usedSigs = set()
     poolExhausted = False
 
-    q = genprob_trig_sketch(maxCoeffMultiple, maxFactorMultiple, 2, 5, usedSigs)
+    for i in range(nQuestions):
+        if i <= 7:
+            if rd.randint(0, 1) == 1:
+                questionType = "genSolution"
+                q = genprob_gen_solution(maxCoeffMultiple, maxFactorMultiple, usedSigs)
+            else:
+                questionType = "exactVal"
+                q = genprob_exact_val(maxAngle, usedSigs)
 
-    # for _ in range(nQuestions):
-    #     if rd.randint(0, 1) == 1:
-    #         questionType = "genSolution"
-    #         q = genprob_gen_solution(maxCoeffMultiple, maxFactorMultiple, usedSigs)
-    #     else:
-    #         questionType = "exactVal"
-    #         q = genprob_exact_val(maxAngle, usedSigs)
-    #
-    #     if q is None:
-    #         if not poolExhausted:
-    #             warnMessages.append(
-    #                 "Requested number of questions exceeds pool of unique exact-value questions given the max angle multiple. Repeats will occur..."
-    #             )
-    #             poolExhausted = True
-    #         if questionType == "genSolution":
-    #             q = genprob_gen_solution(
-    #                 maxCoeffMultiple, maxFactorMultiple, usedSigs, poolExhausted
-    #             )
-    #         elif questionType == "exactVal":
-    #             q = genprob_exact_val(maxAngle, usedSigs, poolExhausted)
-    #
-    #     if q is None:
-    #         # No question could be made for this angle
-    #         warnMessages.append(
-    #             "Could not generate a valid exact-value for the given max angle multiple; skipping..."
-    #         )
-    #         continue
-    #
-    questions.append(q)
+            if q is None:
+                if not poolExhausted:
+                    warnMessages.append(
+                        "Requested number of questions exceeds pool of unique exact-value questions given the max angle multiple. Repeats will occur..."
+                    )
+                    poolExhausted = True
+                if questionType == "genSolution":
+                    q = genprob_gen_solution(
+                        maxCoeffMultiple, maxFactorMultiple, usedSigs, poolExhausted
+                    )
+                elif questionType == "exactVal":
+                    q = genprob_exact_val(maxAngle, usedSigs, poolExhausted)
+
+        else:
+            q = genprob_trig_sketch(maxCoeffMultiple, maxFactorMultiple, 2, 5, usedSigs)
+
+        if q is None:
+            # No question could be made for this angle
+            warnMessages.append(
+                "Could not generate a valid exact-value for the given max angle multiple; skipping..."
+            )
+            continue
+
+        questions.append(q)
 
     return questions, warnMessages
 
