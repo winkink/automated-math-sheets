@@ -457,6 +457,8 @@ LATEX_PREAMBLE = r"""\documentclass[11pt]{article}
 \usepackage{amssymb}
 \usepackage[margin=0.5in]{geometry}
 \usepackage{enumitem}
+\usepackage{pgfplots}
+\pgfplotsset{compat=1.18}
 
 \begin{document}
 \begin{center}
